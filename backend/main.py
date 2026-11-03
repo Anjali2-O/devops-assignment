@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from celery.result import AsyncResult
-from worker import write_log_celery
+from worker import celery, write_log_celery
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -25,7 +25,7 @@ async def notify_user(email: str):
 @app.get("/task_status/{task_id}")
 async def get_task_status(task_id: str):
     """Endpoint to check the status of the task."""
-    task_result = AsyncResult(task_id)  # Get the task result using the task ID
+    task_result = AsyncResult(task_id, app=celery)  # Get the task result using the task ID
     if task_result.ready():  # If the task is done
         return {"task_id": task_id, "status": "completed", "result": task_result.result}
     elif task_result.failed():  # If the task failed

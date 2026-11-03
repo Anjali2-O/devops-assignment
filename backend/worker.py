@@ -1,11 +1,16 @@
+import os
 from celery import Celery
 import time
+
+# Read Redis configuration from the environment.
+# The default supports running the application directly on Windows.
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # Configure Celery to use Redis as the message broker
 celery = Celery(
     "worker",  # This is the name of your Celery application
-    broker="redis://localhost:6379/0",  # This is the Redis connection string
-    backend="redis://localhost:6379/0",  # for storing task results
+    broker=REDIS_URL,  # This is the Redis connection string
+    backend=REDIS_URL,  # for storing task results
 )
 
 

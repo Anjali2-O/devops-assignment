@@ -199,7 +199,7 @@
     </div>
 
     <script>
-      const API_BASE = "http://localhost:8000";
+      const API_BASE = "/api";
 
       const emailInput = document.getElementById("email");
       const notifyBtn = document.getElementById("notify-btn");
@@ -213,7 +213,7 @@
       const progressFill = document.getElementById("progress-fill");
       const progressMsg = document.getElementById("progress-msg");
 
-      const TASK_EST_SEC = 6;
+      const TASK_EST_SEC = 10;
       const DONE_SHOW_MS = 10000;
       let pollTimer = null;
       let progressInterval = null;
