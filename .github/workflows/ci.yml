@@ -34,3 +34,10 @@ jobs:
           file: backend/Dockerfile
           push: false
           tags: devops-assignment:ci
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: false
+          tags: devops-assignment-frontend:ci
