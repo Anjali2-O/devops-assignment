@@ -1,0 +1,122 @@
+name: DevOps Assignment CD
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PROJECT_ID: testing-508709
+  REGION: asia-south1
+  REPOSITORY: devops-assignment
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Generate image tag
+        id: meta
+        run: echo "image_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/423312835935/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
+          service_account: github-actions-deployer@testing-508709.iam.gserviceaccount.com
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker authentication
+        run: gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
+
+      - name: Build and push backend image
+        run: |
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/backend:${GITHUB_SHA}"
+          docker build -f backend/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Build and push frontend image
+        run: |
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/frontend:${GITHUB_SHA}"
+          docker build -f frontend/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+
+  deploy-backend:
+    name: Deploy Backend
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/423312835935/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
+          service_account: github-actions-deployer@testing-508709.iam.gserviceaccount.com
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Update backend image
+        run: |
+          gcloud run services update devops-backend \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/backend:${{ needs.build-and-push.outputs.image_tag }}"
+
+  deploy-worker:
+    name: Deploy Celery Worker
+    needs: [build-and-push, deploy-backend]
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/423312835935/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
+          service_account: github-actions-deployer@testing-508709.iam.gserviceaccount.com
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Update worker pool image
+        run: |
+          gcloud run worker-pools update devops-worker \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/backend:${{ needs.build-and-push.outputs.image_tag }}"
+
+  deploy-frontend:
+    name: Deploy Frontend
+    needs: [build-and-push, deploy-backend]
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/423312835935/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
+          service_account: github-actions-deployer@testing-508709.iam.gserviceaccount.com
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Update frontend image
+        run: |
+          gcloud run services update devops-frontend \
+            --project="${PROJECT_ID}" \
+            --region="${REGION}" \
+            --image="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/frontend:${{ needs.build-and-push.outputs.image_tag }}"
